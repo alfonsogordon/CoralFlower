@@ -88,3 +88,11 @@ Before integrating the radio:
 - Do not expose BLE clock until real-time packets are handled with the same semantics as USB.
 
 **Recovery accessory:** the user plans to purchase an RP-series board. Do not assume a generic RP2040/RP2350 board alone can restore the FM-1. Confirm exact recovery procedure, voltage, pinout, software image and wiring from reliable device-specific instructions before suggesting connections; no flash/erase without verified backup.
+
+## Implemented: staged BLE IRQ-to-TIMER5 bridge
+
+Commits on `feature/bluetooth-midi` add a 32-event SPSC ingress ring in `cf_ble_midi.h` and call `cf_ble_midi_drain()` from TIMER5 after USB and TRS polling. Per service call it forwards at most four events and stops when 24 shared MIDI slots remain, preserving the existing USB EP1 reservation. Invalid or unsupported packets are rejected. The ring overflows by dropping new BLE events and recording a counter, not by setting the existing USB/TRS global MIDI overflow flag.
+
+`tests/cf_ble_midi_test.c` covers valid/invalid packets, bounded drain, reserved headroom and ingress overflow; the GitHub `check` workflow is configured to run it.
+
+**Important remaining correctness work before enabling the radio:** BLE ingress currently assumes exactly one IRQ producer; validate the donor callback's execution context and interrupt nesting. BLE message drops can leave notes stuck: add disconnect and overflow recovery, preferably tracking active notes and issuing releases through the established audio MIDI path. Measure IRQ timing and ensure TIMER5 never starves the audio renderer. No verified device build or hardware testing yet.
