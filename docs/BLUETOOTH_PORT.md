@@ -75,3 +75,16 @@ Confirmed by inspecting CoralFlower `firmware/src/main.c`, `firmware/src/usb.c`,
 9. Only after those gates, prepare a clearly labeled experimental package and ask for explicit permission to test.
 
 No claims of brick-proof operation; flashing always carries residual risk.
+
+## MIDI queue concurrency audit
+
+Verified `firmware/src/cf_out.c` `cf_midi_in()`: audio processing snapshots `mi_w`, drains `midi_in_q` and uses `midi_in_ms` for timing. Existing USB receive runs from TIMER5 ISR and UART shares the same ring. `midi_in_overflow` causes an early return until the existing overflow handler releases notes. Bluetooth must not introduce an unsynchronized additional producer.
+
+Before integrating the radio:
+- Use BLE's own interrupt-to-main-loop ring, then hand off to a carefully serialized producer path. Do not enqueue from BLE radio IRQ.
+- Review whether main-loop enqueue is safe against TIMER5 USB/UART enqueue; protect queue publication with a minimal critical section or redesign as single producer.
+- Reserve USB receive headroom (EP1_ROOM 24 slots) and prevent BLE traffic from starving USB or TRS.
+- Keep timestamps consistent with `fm1_ms`; ensure all-notes-off on disconnect to prevent stuck notes.
+- Do not expose BLE clock until real-time packets are handled with the same semantics as USB.
+
+**Recovery accessory:** the user plans to purchase an RP-series board. Do not assume a generic RP2040/RP2350 board alone can restore the FM-1. Confirm exact recovery procedure, voltage, pinout, software image and wiring from reliable device-specific instructions before suggesting connections; no flash/erase without verified backup.
