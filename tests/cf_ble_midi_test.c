@@ -61,6 +61,7 @@ int main(void)
     assert(cf_ble_midi_receive(pkt(9,0x90,60,100)));
     cf_ble_midi_disconnect();
     assert(cf_ble_faults == 2);
+    assert(cf_ble_epoch == 2);
     cf_ble_midi_drain();
     assert(cf_ble_iw == cf_ble_ir); /* Disconnect flushes stale notes. */
     /* A fault is detected before forwarding any pending event. */
@@ -68,6 +69,7 @@ int main(void)
     cf_ble_midi_disconnect();
     cf_ble_midi_drain();
     assert(cf_ble_ir == cf_ble_iw);
+    assert(cf_ble_epoch == 3);
     assert(cf_ble_midi_receive(pkt(9,0x90,60,100)));
     midi_in_overflow = 1;
     cf_ble_midi_drain();
