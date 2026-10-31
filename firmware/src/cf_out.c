@@ -214,6 +214,7 @@ static void events_block(uint32_t n)
     uint32_t i, pr = panic_req;
     (void)n;
     panic_req = 0;
+#if CF_BLE_MIDI
     /* BLE ingress loss/disconnect can strand a note-off. Release voices
      * through the existing audio-block panic path, never from radio IRQ. */
     {
@@ -224,6 +225,7 @@ static void events_block(uint32_t n)
             pr |= (1u << NTRK) - 1u;
         }
     }
+#endif
     if (midi_in_overflow) {
         mi_r = mi_w;
         pr |= (1u << NTRK) - 1u;
