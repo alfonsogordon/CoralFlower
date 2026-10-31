@@ -21,12 +21,13 @@ static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
     uint32_t status = (packet >> 8) & 0xffu;
     uint32_t data1 = (packet >> 16) & 0xffu;
     uint32_t data2 = (packet >> 24) & 0xffu;
-    uint32_t w = cf_ble_iw;
+    uint32_t w;
     /* Only valid channel voice. System, SysEx and clock are not ready. */
     if (cin < 8u || cin > 0xeu || status < 0x80u || status >= 0xf0u ||
         (status >> 4) != cin || (data1 & 0x80u) ||
         (cin != 0xcu && cin != 0xdu && (data2 & 0x80u))
         return 0;
+    w = cf_ble_iw;
     if (w - cf_ble_ir >= CF_BLE_IQ) {
         cf_ble_dropped++;
         cf_ble_epoch++;
