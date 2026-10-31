@@ -28,3 +28,24 @@ Status: source structure inspected; no Bluetooth firmware implementation or hard
 Use an Android app capable of advertising BLE MIDI as a *peripheral* (not merely connecting to peripherals). Verify scan, connect, note on/off, CC, disconnect and reconnect.
 
 Do not flash an unbuilt or unverified firmware. Preserve upstream CoralFlower and main branch.
+
+
+## Source-level donor mapping (31 Oct 2026)
+
+GitHub code search and direct file retrieval verified these donor paths:
+- `device/bt_own_central.c`: FM1-facing scan, connect, disconnect, state and passkey APIs. It is included as part of `device/bt_own.c`; **not** a standalone module.
+- `bt/ble/ble_central.c`: BLE initiator connection state machine, encryption/pairing and GATT client subscription.
+- `bt/ble/ble_gattc.c`: GATT client used to discover and subscribe to BLE-MIDI characteristics.
+- `bt/ble/ble_host.c`, `bt/ble/ble_stack.c`, `bt/ble/ble_smp_init.c`: supporting BLE host, stack and pairing.
+- `device/radio.c`: radio startup, timing, interrupt masking, watchdog, callbacks and scheduler integration.
+- `lib/btdev.c`, `lib/btdev.h`: higher-level device management.
+- `docs/bt/BLE-DEVICES-DESIGN.md`: intended discovery, saved-device and reconnect behavior.
+
+Important integration findings:
+- Donor `device/bt_own_central.c` depends on symbols such as `own_held`, `ble_state`, `shim_ms`, `ble_ll_scan`, `ble_scan_add`, `ble_central_connect` and `ota_wire_send`; copying it alone will not link.
+- Donor `device/radio.c` provides a nested IRQ guard and millisecond timing based on FM1 ticks. These must be reconciled with CoralFlower's existing HAL and audio timing before enabling the radio.
+- CoralFlower uses `firmware/src/coralflower.c` as its unity build, and currently includes `usb.c` and `midi_uart.c`. The adapter should enter the existing MIDI receive dispatch, not synth note handling directly.
+- Donor documentation says one active BLE link at a time. Device role changes and Android peripheral pairing require validation.
+- Donor `bt_own_central.c` explicitly notes that central peer bonds are not yet persisted in its key callback. Do **not** promise automatic bonded reconnection without implementing and testing persistence.
+
+Next step: inspect full donor `device/bt_own.c`, `bt/ble/ble_stack.c` and CoralFlower `firmware/src/main.c` and `firmware/src/usb.c`; then define a build-flagged BLE transport adapter. Do not introduce untested radio init into the production boot path.
