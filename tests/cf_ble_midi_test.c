@@ -55,8 +55,17 @@ int main(void)
         assert(cf_ble_midi_receive(pkt(9,0x90,60,100)));
     assert(!cf_ble_midi_receive(pkt(9,0x90,60,100)));
     assert(cf_ble_dropped == 1);
+    assert(cf_ble_faults == 1);
+    cf_ble_midi_drain();
+    assert(cf_ble_iw == cf_ble_ir); /* Stale notes flushed on loss. */
+    assert(cf_ble_midi_receive(pkt(9,0x90,60,100)));
+    cf_ble_midi_disconnect();
+    assert(cf_ble_faults == 2);
+    cf_ble_midi_drain();
+    assert(cf_ble_iw == cf_ble_ir); /* Disconnect flushes stale notes. */
+    assert(cf_ble_midi_receive(pkt(9,0x90,60,100)));
     midi_in_overflow = 1;
     cf_ble_midi_drain();
-    assert(cf_ble_iw - cf_ble_ir == CF_BLE_IQ);
+    assert(cf_ble_iw - cf_ble_ir == 1);
     return 0;
 }
