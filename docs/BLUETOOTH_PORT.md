@@ -120,3 +120,9 @@ For CoralFlower, wire the donor callback `ble_app_midi_in(packet, ts, last_ts)` 
 Central UI must offer scan, discovered names, connect, disconnect and status. SMC-Mixer discovery must use BLE MIDI service/GATT rather than trusting device name alone. Confirm licensing on every imported donor file. Validate memory map, RF calibration and bootloader boundaries before any device image is produced.
 
 The radio stack has **not** been imported or initialized. The latest transport bridge also rechecks faults between forwarded messages to stop a mid-drain disconnect from releasing more stale events.
+
+## Link-generation tagging (staged)
+
+The ingress ring now carries a `cf_ble_epoch` alongside each MIDI packet. A link-loss notification or ingress overflow increments the epoch; TIMER5 discards entries whose generation no longer matches. This complements the fault counter and audio-side voice release, and is intended to prevent queued MIDI events from a previous connection being forwarded after reconnect.
+
+The actual BLE driver **must** call `cf_ble_midi_disconnect()` when a connection ends. Without the radio integration this is not yet exercised against real link events. The ring remains single-producer/single-consumer; multiple BLE IRQ callback contexts would invalidate this assumption and must be audited. A successful compile, RF initialization, BLE-MIDI discovery and hardware test are still pending.
