@@ -70,6 +70,12 @@ jobs:
           cc -std=gnu11 -O2 -Wall -Wno-unused-function -Ifirmware/src -o build/host/st_log_test tests/st_log_test.c
           build/host/st_log_test
 
+      - name: BLE MIDI adapter host regression tests
+        run: |
+          set -euo pipefail
+          cc -std=c99 -Wall -Wextra -Werror -o build/host/cf_ble_midi_test tests/cf_ble_midi_test.c
+          build/host/cf_ble_midi_test
+
       - name: The tracked tree is as it was
         run: |
           set -euo pipefail
