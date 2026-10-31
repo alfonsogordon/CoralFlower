@@ -139,8 +139,13 @@ static void cf_fx_chain(int32_t *l, int32_t *r, uint32_t n);
 
 /* ------------------------------------------------------------ MIDI --- */
 #include "usb.c"
-/* Staged BLE MIDI adapter: no radio initialization or IRQs in this build. */
+/* Opt-in only: no BLE radio or MIDI bridge in normal firmware builds. */
+#ifndef CF_BLE_MIDI
+#define CF_BLE_MIDI 0
+#endif
+#if CF_BLE_MIDI
 #include "cf_ble_midi.h"
+#endif
 #if FELUCCA_UART
 #include "midi_uart.c"
 #endif
