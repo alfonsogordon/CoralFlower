@@ -23,6 +23,8 @@ static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
     uint32_t data1 = (packet >> 16) & 0xffu;
     uint32_t data2 = (packet >> 24) & 0xffu;
     uint32_t w;
+    if (!cf_ble_link_up)
+        return 0;
     /* Only valid channel voice. System, SysEx and clock are not ready. */
     if (cin < 8u || cin > 0xeu || status < 0x80u || status >= 0xf0u ||
         (status >> 4) != cin || (data1 & 0x80u) ||
