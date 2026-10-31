@@ -126,3 +126,11 @@ The radio stack has **not** been imported or initialized. The latest transport b
 The ingress ring now carries a `cf_ble_epoch` alongside each MIDI packet. A link-loss notification or ingress overflow increments the epoch; TIMER5 discards entries whose generation no longer matches. This complements the fault counter and audio-side voice release, and is intended to prevent queued MIDI events from a previous connection being forwarded after reconnect.
 
 The actual BLE driver **must** call `cf_ble_midi_disconnect()` when a connection ends. Without the radio integration this is not yet exercised against real link events. The ring remains single-producer/single-consumer; multiple BLE IRQ callback contexts would invalidate this assumption and must be audited. A successful compile, RF initialization, BLE-MIDI discovery and hardware test are still pending.
+
+## Radio-to-transport interface (staged)
+
+The radio owner should report changes through `cf_ble_midi_link_changed(1)` on BLE-MIDI readiness and `cf_ble_midi_link_changed(0)` on link loss. Duplicate reports are ignored. Explicit `cf_ble_midi_disconnect()` is retained for transport faults and unexpected radio resets; it always invalidates the session and requests voice recovery. The first successful connection increments `cf_ble_epoch`, so queued messages from a previous session cannot be replayed.
+
+`cf_ble_midi_receive()` currently does **not** require `cf_ble_link_up`: this keeps isolated host tests usable and assumes the radio stack calls it only for ready BLE-MIDI links. The final radio integration must enforce this at its callback boundary. A session change during an in-progress queue drain requires hardware/IRQ priority validation; the generation tags are defensive but do not substitute for correct producer/consumer synchronization.
+
+The `BLE_CENTRAL` donor is not a drop-in library: `ble_stack.c` conditionally includes scanner, GATT client and central state machine, but also requires the hardware baseband driver and board-specific RF initialization. A stub BLE hardware driver exists in the donor for compile-only experiments, but a stub build cannot scan or connect. Avoid shipping a stub as a functional BLE firmware.
