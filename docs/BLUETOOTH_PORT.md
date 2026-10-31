@@ -96,3 +96,11 @@ Commits on `feature/bluetooth-midi` add a 32-event SPSC ingress ring in `cf_ble_
 `tests/cf_ble_midi_test.c` covers valid/invalid packets, bounded drain, reserved headroom and ingress overflow; the GitHub `check` workflow is configured to run it.
 
 **Important remaining correctness work before enabling the radio:** BLE ingress currently assumes exactly one IRQ producer; validate the donor callback's execution context and interrupt nesting. BLE message drops can leave notes stuck: add disconnect and overflow recovery, preferably tracking active notes and issuing releases through the established audio MIDI path. Measure IRQ timing and ensure TIMER5 never starves the audio renderer. No verified device build or hardware testing yet.
+
+## Staged disconnect/overflow recovery
+
+The BLE ingress ring now increments `cf_ble_faults` on dropped events or an explicit `cf_ble_midi_disconnect()`. TIMER5 notices a new fault and discards pending BLE events; `cf_out.c` audio `events_block()` notices the monotonic fault counter and requests the existing all-part voice-release path. This avoids direct voice manipulation from radio IRQ. Tests cover overflow/disconnect ring flush.
+
+**Trade-off:** this releases all parts, including USB/TRS-held notes, on a BLE fault. It is deliberately conservative until per-source note ownership exists; refine before shipping. The BLE driver must call `cf_ble_midi_disconnect()` on every actual link loss. The current code has no radio driver yet, so the callback is not connected.
+
+**Critical:** GitHub workflow run success and device link have not been confirmed. Code commits are not proof of a tested firmware image.
