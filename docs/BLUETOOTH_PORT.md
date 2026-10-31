@@ -110,3 +110,13 @@ The BLE ingress ring now increments `cf_ble_faults` on dropped events or an expl
 `CF_BLE_MIDI` defaults to **0** in `coralflower.c`. The staged adapter include, TIMER5 drain and audio-block BLE fault release are all conditional on `CF_BLE_MIDI`. Existing firmware builds therefore do not execute or allocate the experimental BLE ingress ring. The `check` GitHub workflow compiles both default and `-DCF_BLE_MIDI=1` variants and runs the BLE host regression test.
 
 Enabling `CF_BLE_MIDI=1` enables **only the ingress bridge**, not the BLE radio, central scanning, GATT or pairing. Never label such a binary BLE-ready. CI run results have not yet been independently confirmed.
+
+## BLE Central implementation boundary
+
+The donor `charlesvestal/fm1-base/device/bt_own_central.c` exposes `plat_ble_scan`, `plat_ble_found`, `plat_ble_connect`, `plat_ble_disconnect`, and `plat_ble_device`. These are not standalone: they require the donor's `bt/ble/ble_stack.c` aggregation, `device/bt_own.c`, `device/radio.c`, hardware BLE HAL `fm1_ble.h`, calibration trim sources, and their linker/IRQ setup. Copying only `bt_own_central.c` would not yield a functional radio.
+
+For CoralFlower, wire the donor callback `ble_app_midi_in(packet, ts, last_ts)` to `cf_ble_midi_receive(packet)` **only after** checking the callback's interrupt context, packet packing, memory barriers and single-producer assumption. Wire link-loss notification to `cf_ble_midi_disconnect()`. BLE-MIDI timestamps are currently discarded in favour of the existing shared queue's `fm1_ms`; evaluate jitter before release.
+
+Central UI must offer scan, discovered names, connect, disconnect and status. SMC-Mixer discovery must use BLE MIDI service/GATT rather than trusting device name alone. Confirm licensing on every imported donor file. Validate memory map, RF calibration and bootloader boundaries before any device image is produced.
+
+The radio stack has **not** been imported or initialized. The latest transport bridge also rechecks faults between forwarded messages to stop a mid-drain disconnect from releasing more stale events.
