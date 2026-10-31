@@ -13,6 +13,7 @@
 static uint32_t cf_ble_iq[CF_BLE_IQ];
 static volatile uint32_t cf_ble_iw, cf_ble_ir, cf_ble_dropped, cf_ble_faults;
 static volatile uint32_t cf_ble_epoch;
+static volatile uint8_t cf_ble_link_up;
 static uint32_t cf_ble_iq_epoch[CF_BLE_IQ];
 
 static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
@@ -41,9 +42,24 @@ static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
     return 1;
 }
 
-/* Called on link loss from the BLE producer context, not the audio ISR. */
+/* BLE link state changes are delivered by the eventual radio owner.
+ * Ignore repeated state reports; a disconnect always invalidates queued
+ * packets and releases voices, but never call audio functions from IRQ. */
+static void __attribute__((unused)) cf_ble_midi_link_changed(int connected)
+{
+    uint8_t next = connected ? 1u : 0u;
+    if (next == cf_ble_link_up)
+        return;
+    cf_ble_link_up = next;
+    cf_ble_epoch++;
+    if (!next)
+        cf_ble_faults++;
+}
+
+/* Explicit transport fault, including an unannounced radio reset. */
 static void __attribute__((unused)) cf_ble_midi_disconnect(void)
 {
+    cf_ble_link_up = 0;
     cf_ble_epoch++;
     cf_ble_faults++;
 }
