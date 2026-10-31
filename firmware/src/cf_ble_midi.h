@@ -1,35 +1,56 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * CoralFlower Bluetooth MIDI receive adapter.
+ * BLE MIDI ingress bridge, staging only. No BLE radio is enabled here.
  *
- * STAGING ONLY: no radio is initialized or linked by this file yet.
- * Include after usb.c in the CoralFlower unity build, then call
- * cf_ble_midi_receive() from the eventual BLE main-loop ring drain.
- *
- * BLE radio interrupts must NOT call midi_enqueue directly: the existing
- * USB/TRS MIDI ring is consumed by the audio interrupt and its producer
- * assumptions must be checked before introducing another IRQ producer.
+ * Exactly one BLE IRQ producer calls cf_ble_midi_receive(); TIMER5 is the
+ * only consumer and forwards to the existing USB/TRS MIDI ring. Never call
+ * midi_enqueue from a BLE IRQ or from the main loop.
  */
 #ifndef CF_BLE_MIDI_ADAPTER_H
 #define CF_BLE_MIDI_ADAPTER_H
+#define CF_BLE_IQ 32u
+#define CF_BLE_TICK_BUDGET 4u
+#define CF_BLE_USB_RESERVE 24u
+static uint32_t cf_ble_iq[CF_BLE_IQ];
+static volatile uint32_t cf_ble_iw, cf_ble_ir, cf_ble_dropped;
 
-/* The BLE stack supplies a USB-MIDI event packet: cable/CIN in byte 0,
- * status in byte 1, data bytes in bytes 2-3. Discard the donor's
- * cable number (which identifies the BLE role, not a CoralFlower part).
- * The queue's existing timestamp uses fm1_ms. */
 static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
 {
     uint32_t cin = packet & 0x0fu;
     uint32_t status = (packet >> 8) & 0xffu;
     uint32_t data1 = (packet >> 16) & 0xffu;
     uint32_t data2 = (packet >> 24) & 0xffu;
-    /* Stage 1: accept channel voice only. SysEx, real-time clock and
-     * system messages require explicit parser/source review before enabling. */
-    if (cin < 8u || cin > 0xeu || status < 0x80u || status >= 0xf0u)
+    uint32_t w = cf_ble_iw;
+    /* Only valid channel voice. System, SysEx and clock are not ready. */
+    if (cin < 8u || cin > 0xeu || status < 0x80u || status >= 0xf0u ||
+        (status >> 4) != cin || (data1 & 0x80u) ||
+        (cin != 0xcu && cin != 0xdu && (data2 & 0x80u))
         return 0;
-    if ((status >> 4) != cin || (data1 & 0x80u))
+    if (w - cf_ble_ir >= CF_BLE_IQ) {
+        cf_ble_dropped++;
         return 0;
-    if (cin != 0xcu && cin != 0xdu && (data2 & 0x80u))
-        return 0;
-    return midi_enqueue((packet & ~0xf0u), 3u);
+    }
+    cf_ble_iq[w % CF_BLE_IQ] = packet & ~0xf0u;
+    RING_PUBLISH();
+    cf_ble_iw = w + 1u;
+    return 1;
+}
+
+/* Call only from TIMER5's non-nested MIDI service, after USB and UART.
+ * Headroom ensures a BLE burst cannot consume the USB EP1 reservation.
+ * The BLE producer must be a single IRQ context; IRQ priorities and
+ * disconnect note-release behavior still require hardware validation.
+ */
+static void __attribute__((unused)) cf_ble_midi_drain(void)
+{
+    uint32_t n = 0;
+    while (cf_ble_ir != cf_ble_iw && n < CF_BLE_TICK_BUDGET &&
+           !midi_in_overflow && MQ - (mi_w - mi_r) > CF_BLE_USB_RESERVE) {
+        uint32_t packet = cf_ble_iq[cf_ble_ir % CF_BLE_IQ];
+        if (!midi_enqueue(packet, 3u))
+            break;
+        RING_PUBLISH();
+        cf_ble_ir++;
+        n++;
+    }
 }
 #endif
