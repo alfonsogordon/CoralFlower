@@ -16,7 +16,7 @@
  * status in byte 1, data bytes in bytes 2-3. Discard the donor's
  * cable number (which identifies the BLE role, not a CoralFlower part).
  * The queue's existing timestamp uses fm1_ms. */
-static int cf_ble_midi_receive(uint32_t packet)
+static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
 {
     uint32_t cin = packet & 0x0fu;
     uint32_t status = (packet >> 8) & 0xffu;
