@@ -14,6 +14,7 @@ static uint32_t cf_ble_iq[CF_BLE_IQ];
 static volatile uint32_t cf_ble_iw, cf_ble_ir, cf_ble_dropped, cf_ble_faults;
 static volatile uint32_t cf_ble_epoch;
 static volatile uint8_t cf_ble_link_up;
+static volatile uint32_t cf_ble_rejected_offline;
 static uint32_t cf_ble_iq_epoch[CF_BLE_IQ];
 
 static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
@@ -23,8 +24,10 @@ static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
     uint32_t data1 = (packet >> 16) & 0xffu;
     uint32_t data2 = (packet >> 24) & 0xffu;
     uint32_t w;
-    if (!cf_ble_link_up)
+    if (!cf_ble_link_up) {
+        cf_ble_rejected_offline++;
         return 0;
+    }
     /* Only valid channel voice. System, SysEx and clock are not ready. */
     if (cin < 8u || cin > 0xeu || status < 0x80u || status >= 0xf0u ||
         (status >> 4) != cin || (data1 & 0x80u) ||
