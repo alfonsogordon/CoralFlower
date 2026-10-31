@@ -14,8 +14,32 @@
  * BPM, a 64-bit count: no drift). */
 
 enum { CF_ARP_UP, CF_ARP_DOWN, CF_ARP_INC, CF_ARP_EXC, CF_ARP_RAND, CF_ARP_ORDER, CF_ARP_REPEAT, CF_ARP_STRUM_UP,
-       CF_ARP_STRUM_DOWN, CF_ARP_NMODES };
-#define CF_ARP_STRUMMING(m) ((m) >= CF_ARP_STRUM_UP)
+       CF_ARP_STRUM_DOWN, CF_ARP_PATTERN_FIRST, CF_ARP_NMODES = CF_ARP_PATTERN_FIRST + 12 };
+#define CF_ARP_STRUMMING(m) ((m) >= CF_ARP_STRUM_UP && (m) <= CF_ARP_STRUM_DOWN)
+/* ChoralRoot's twelve designed phrases, copied from cr_engine.c (GPL-3.0-only).
+ * Each byte: high nibble accent, low nibble 1-based chord tone, zero rest.
+ * The pattern selector is appended to MODE to avoid changing existing
+ * saved numeric mode values. */
+static const uint8_t CF_ARP_PATTERNS[] = {
+    0x0E,0x12,0x16,0x19,0x1D,0x23,0x2B,0x33,0x39,0x41,0x49,0x51,0x59,
+    0xF1,0x82,0xB3,0x84, 0xF1,0x83,0xB2,0x83,
+    0xF1,0x93,0x92, 0xF4,0x93,0xB2,0x91,
+    0xF1,0x82,0x93,0xF4,0x83,0x92,
+    0xF1,0x00,0xC2,0x93,0x00,0x81,0xC3,0x00,
+    0xF1,0x31,0xC2,0x31,0xF3,0x31,0xC4,0x31,
+    0xF1,0x93,0xB2,0x94,0xB3,0x95,
+    0xF1,0x00,0x00,0x93,0xC2,0x00,0x83,0x00,
+    0xF1,0x00,0xB3,0x00,0xC2,0x00,0xB4,0x00,
+    0xF1,0x32,0x81,0x33,0xC1,0x34,0x81,0x32,
+    0xF1,0x82,0x31,0xB3,0x31,0xC4,0x31,0xB5
+};
+static uint8_t cfa_pattern_step(uint32_t mode, uint32_t step)
+{
+    uint32_t p = mode - CF_ARP_PATTERN_FIRST;
+    uint32_t start = CF_ARP_PATTERNS[p], end = CF_ARP_PATTERNS[p+1u];
+    return CF_ARP_PATTERNS[start + step % (end-start)];
+}
+
 /* RATE: a step, in 1/24 beat (a quarter note: 24) */
 static const uint8_t CF_ARP_UNITS[] = {96, 48, 24, 16, 12, 8, 6, 4, 3};
 #define CF_ARP_NRATES ((uint32_t)sizeof CF_ARP_UNITS)
@@ -74,6 +98,15 @@ static int cfa_pick(uint32_t i)
     int nt;
     if (!n)
         return -1;
+    if (cfp_cfg.arp.mode >= CF_ARP_PATTERN_FIRST &&
+        cfp_cfg.arp.mode < CF_ARP_NMODES) {
+        uint32_t step = cfa_pattern_step(cfp_cfg.arp.mode, i) & 15u;
+        if (!step)
+            return -1; /* Rest: previous note must be released. */
+        k = (step - 1u) % len;
+        nt = src[k % n] + 12 * (int)(k / n);
+        return nt > 127 ? src[k % n] : nt;
+    }
     switch (cfp_cfg.arp.mode) {
     case CF_ARP_DOWN: k = len - 1u - i % len; break;
     case CF_ARP_INC: k = i % (2u * len); k = k < len ? k : 2u * len - 1u - k; break;
