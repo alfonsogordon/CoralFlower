@@ -24,6 +24,7 @@ int main(void)
 {
     uint32_t i;
     assert(!cf_ble_midi_receive(pkt(9,0x90,60,100))); /* Not connected. */
+    assert(cf_ble_rejected_offline == 1);
     cf_ble_midi_link_changed(1);
     assert(cf_ble_link_up == 1 && cf_ble_epoch == 1);
     cf_ble_midi_link_changed(1);
@@ -68,6 +69,7 @@ int main(void)
     assert(cf_ble_faults == 2);
     assert(cf_ble_epoch == 3);
     assert(!cf_ble_midi_receive(pkt(9,0x90,60,100))); /* Disconnected. */
+    assert(cf_ble_rejected_offline == 2);
     cf_ble_midi_link_changed(1);
     cf_ble_midi_drain();
     assert(cf_ble_iw == cf_ble_ir); /* Disconnect flushes stale notes. */
@@ -80,6 +82,7 @@ int main(void)
     assert(!cf_ble_midi_receive(pkt(9,0x90,60,100)));
     cf_ble_midi_link_changed(1);
     assert(cf_ble_epoch == 6);
+    assert(cf_ble_rejected_offline == 3);
     assert(cf_ble_midi_receive(pkt(9,0x90,60,100)));
     midi_in_overflow = 1;
     cf_ble_midi_drain();
