@@ -49,3 +49,29 @@ Important integration findings:
 - Donor `bt_own_central.c` explicitly notes that central peer bonds are not yet persisted in its key callback. Do **not** promise automatic bonded reconnection without implementing and testing persistence.
 
 Next step: inspect full donor `device/bt_own.c`, `bt/ble/ble_stack.c` and CoralFlower `firmware/src/main.c` and `firmware/src/usb.c`; then define a build-flagged BLE transport adapter. Do not introduce untested radio init into the production boot path.
+
+## Flash safety gate — mandatory before user testing
+
+**Current status: NO FLASH.** No BLE driver has been integrated or built.
+
+Confirmed by inspecting CoralFlower `firmware/src/main.c`, `firmware/src/usb.c`, `firmware/src/coralflower.c` and `tools/build.py`:
+
+- The boot stub validates a loader commit marker and app CRC before entering the app. OCT- at power-on is documented as a recovery key; OCT- + OCT+ triggers app calibration instead. Verify actual behavior on hardware and with the exact installer before relying on it.
+- Boot guard records early resets and enters SAFE MODE after repeated failures, eventually UBOOT. This only helps if the boot stub and recovery path remain intact.
+- The app's USB MIDI queue has 64 entries and USB receives in TIMER5 IRQ; audio ISR drains it. BLE IRQ must not write that queue directly. A main-loop bridge still needs concurrency analysis because USB/TIMER5 can preempt it.
+- The USB MIDI parser handles SysEx, clock and status validation separately. The staging BLE adapter therefore accepts **channel voice only** and cannot yet provide clock or SysEx.
+- The BLE adapter header is **not included** by `coralflower.c`; it has no effect on any firmware image yet.
+
+### Required preflash evidence
+
+1. Verify original fork commit and compare proposed changes against main.
+2. Build unmodified main with the same toolchain as the BLE branch; capture output hashes and memory section sizes.
+3. Confirm linker addresses and reserved flash ranges for boot stub, update loader, settings, calibration and BLE storage; no overlapping radio persistence writes.
+4. Compile BLE branch with strict warnings and validate full link; no unresolved references.
+5. Ensure radio startup is disabled in SAFE MODE and failure falls back to existing non-BLE boot.
+6. Verify radio IRQ priorities, critical sections, watchdog feeding and measured audio worst-case load.
+7. Confirm firmware identity and installer accept only the intended FM1 target; no automatic deployment.
+8. Verify recovery procedure and availability of known-good firmware **before** any user flash.
+9. Only after those gates, prepare a clearly labeled experimental package and ask for explicit permission to test.
+
+No claims of brick-proof operation; flashing always carries residual risk.
