@@ -104,3 +104,9 @@ The BLE ingress ring now increments `cf_ble_faults` on dropped events or an expl
 **Trade-off:** this releases all parts, including USB/TRS-held notes, on a BLE fault. It is deliberately conservative until per-source note ownership exists; refine before shipping. The BLE driver must call `cf_ble_midi_disconnect()` on every actual link loss. The current code has no radio driver yet, so the callback is not connected.
 
 **Critical:** GitHub workflow run success and device link have not been confirmed. Code commits are not proof of a tested firmware image.
+
+## Compile-time isolation (latest)
+
+`CF_BLE_MIDI` defaults to **0** in `coralflower.c`. The staged adapter include, TIMER5 drain and audio-block BLE fault release are all conditional on `CF_BLE_MIDI`. Existing firmware builds therefore do not execute or allocate the experimental BLE ingress ring. The `check` GitHub workflow compiles both default and `-DCF_BLE_MIDI=1` variants and runs the BLE host regression test.
+
+Enabling `CF_BLE_MIDI=1` enables **only the ingress bridge**, not the BLE radio, central scanning, GATT or pairing. Never label such a binary BLE-ready. CI run results have not yet been independently confirmed.
