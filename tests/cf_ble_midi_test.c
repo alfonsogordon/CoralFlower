@@ -77,6 +77,9 @@ int main(void)
     cf_ble_midi_drain();
     assert(cf_ble_ir == cf_ble_iw);
     assert(cf_ble_epoch == 5);
+    assert(!cf_ble_midi_receive(pkt(9,0x90,60,100)));
+    cf_ble_midi_link_changed(1);
+    assert(cf_ble_epoch == 6);
     assert(cf_ble_midi_receive(pkt(9,0x90,60,100)));
     midi_in_overflow = 1;
     cf_ble_midi_drain();
