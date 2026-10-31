@@ -11,7 +11,7 @@
 #define CF_BLE_TICK_BUDGET 4u
 #define CF_BLE_USB_RESERVE 24u
 static uint32_t cf_ble_iq[CF_BLE_IQ];
-static volatile uint32_t cf_ble_iw, cf_ble_ir, cf_ble_dropped;
+static volatile uint32_t cf_ble_iw, cf_ble_ir, cf_ble_dropped, cf_ble_faults;
 
 static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
 {
@@ -27,12 +27,19 @@ static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
         return 0;
     if (w - cf_ble_ir >= CF_BLE_IQ) {
         cf_ble_dropped++;
+        cf_ble_faults++; /* Lost note-off may stick: audio must release notes. */
         return 0;
     }
     cf_ble_iq[w % CF_BLE_IQ] = packet & ~0xf0u;
     RING_PUBLISH();
     cf_ble_iw = w + 1u;
     return 1;
+}
+
+/* Called on link loss from the BLE producer context, not the audio ISR. */
+static void __attribute__((unused)) cf_ble_midi_disconnect(void)
+{
+    cf_ble_faults++;
 }
 
 /* Call only from TIMER5's non-nested MIDI service, after USB and UART.
@@ -42,7 +49,14 @@ static int __attribute__((unused)) cf_ble_midi_receive(uint32_t packet)
  */
 static void __attribute__((unused)) cf_ble_midi_drain(void)
 {
+    static uint32_t seen_faults;
     uint32_t n = 0;
+    if (seen_faults != cf_ble_faults) {
+        seen_faults = cf_ble_faults;
+        cf_ble_ir = cf_ble_iw; /* Discard stale note-ons after a fault. */
+        RING_PUBLISH();
+        return;
+    }
     while (cf_ble_ir != cf_ble_iw && n < CF_BLE_TICK_BUDGET &&
            !midi_in_overflow && MQ - (mi_w - mi_r) > CF_BLE_USB_RESERVE) {
         uint32_t packet = cf_ble_iq[cf_ble_ir % CF_BLE_IQ];
