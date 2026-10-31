@@ -122,6 +122,8 @@ void fm1_timer5_irq(void)
     if (owed & 2u)
         uart_midi_poll();
 #endif
+    /* BLE ingress is drained only here: TIMER5 owns MIDI queue writes. */
+    cf_ble_midi_drain();
     owed = 0;
 }
 extern void isr_timer5(void);
