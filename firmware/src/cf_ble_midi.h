@@ -59,6 +59,14 @@ static void __attribute__((unused)) cf_ble_midi_drain(void)
     }
     while (cf_ble_ir != cf_ble_iw && n < CF_BLE_TICK_BUDGET &&
            !midi_in_overflow && MQ - (mi_w - mi_r) > CF_BLE_USB_RESERVE) {
+        /* A radio fault can arrive while TIMER5 drains. Never forward
+         * messages observed after that fault, even in this same tick. */
+        if (seen_faults != cf_ble_faults) {
+            seen_faults = cf_ble_faults;
+            cf_ble_ir = cf_ble_iw;
+            RING_PUBLISH();
+            return;
+        }
         uint32_t packet = cf_ble_iq[cf_ble_ir % CF_BLE_IQ];
         if (!midi_enqueue(packet, 3u))
             break;
