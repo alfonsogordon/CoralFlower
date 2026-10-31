@@ -82,9 +82,9 @@ static int wrapi(int v, int n) { return ((v % n) + n) % n; }
 
 /* the arpeggiator's names: a knob cell's (7 characters at most), the screen's title */
 static const char *const CF_ARP_SHORT[CF_ARP_NMODES] = {"Up", "Down", "Incl", "Excl", "Random", "Order", "Repeat",
-                                                        "Strum\x84", "Strum\x85"};
+                                                        "Strum\x84", "Strum\x85", "Pulse", "Alberti", "Waltz", "Cascade", "UpDown", "Syncop", "Gallop", "Skip", "Ballad", "Stride", "Drive", "Ladder"};
 static const char *const CF_ARP_NAME[CF_ARP_NMODES] = {"Up", "Down", "Inclusive", "Exclusive", "Random", "Order",
-                                                       "Repeat", "Strum up", "Strum down"};
+                                                       "Repeat", "Strum up", "Strum down", "Pattern pulse", "Pattern alberti", "Pattern waltz", "Pattern cascade", "Pattern updown", "Pattern syncopate", "Pattern gallop", "Pattern skip", "Pattern ballad", "Pattern stride", "Pattern drive", "Pattern ladder"};
 static const char *const CF_ARP_RATE[CF_ARP_NRATES] = {"1/1", "1/2", "1/4", "1/4T", "1/8", "1/8T", "1/16", "1/16T",
                                                        "1/32"};
 
