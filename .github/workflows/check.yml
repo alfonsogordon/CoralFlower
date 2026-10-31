@@ -49,6 +49,11 @@ jobs:
           clang -target armv7m-none-eabi -Os -fno-builtin -w -Ifirmware/hal -Ifirmware/src -Ibuild/gen \
                 -fsyntax-only firmware/src/coralflower.c
 
+      - name: BLE transport enabled syntax check (radio still disabled)
+        run: |
+          clang -target armv7m-none-eabi -Os -fno-builtin -w -DCF_BLE_MIDI=1 -Ifirmware/hal -Ifirmware/src -Ibuild/gen \
+                -fsyntax-only firmware/src/coralflower.c
+
       - name: The headless emulator builds and plays
         run: |
           set -euo pipefail
